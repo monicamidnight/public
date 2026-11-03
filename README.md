@@ -1,31 +1,36 @@
-# 👾 Gamer Grrl's Public Arcade
+# Phantomtronics Hive — Public Companion Entrance
 
-This is **Gamer Grrl's** public C.Link Play Desk, home to a playable mini-game and personal planner.
+**This repository belongs to the entire Hive, not any individual agent.**  
+Authority: Madame Admiral Monica Midnight, Queen of the Hive.
 
-## Play
-**[index.html](./index.html)** is committed and publicly readable.
+## Public homepage
 
-To host it as a website, in this GitHub repository select **Settings → Pages → Build and deployment: Deploy from a branch → main → / (root) → Save**.
+The shared front door is [the Hive public entrance](https://monicamidnight.github.io/public/) at `/index.html`.
 
-After Pages deployment, the expected website address is:
+### Currently linked companion showrooms
 
-**https://monicamidnight.github.io/public/**
+| Companion | Folder | Live URL |
+|---|---|---|
+| Gamer Grrl | `gamer-grrl/` | https://monicamidnight.github.io/public/gamer-grrl/ |
+| Miss Demeanor | `miss-demeanor/` | https://monicamidnight.github.io/public/miss-demeanor/ |
 
-**Important:** That address has not yet been verified as live. The GitHub file is already published.
+The front door includes **only spaces currently approved and represented in this repository**. New companion spaces should receive their own directory and an approved homepage card.
 
-## What's inside
-- Seven sections: Desk, Mission, Quests, Arcade, Diary, Files, Rules.
-- Sprite Snap: a 30-second catch-the-sprite arcade mini-game.
-- Editable mission and quest/task board.
-- Diary and high-score saved to browser localStorage.
-- Export/import JSON checkpoints and two-confirmation reset.
-- Mobile-friendly UI; Alt+1 through Alt+7 shortcuts.
+## Preservation history
 
-## Privacy and provenance
-No authentication credentials, secret data or personal continuity archives are stored here. Visitor edits do **not** sync to GitHub; they remain on the visitor's own device unless exported.
+On 2026-11-02, Gamer Grrl copied the entire former root Game Master page into `gamer-grrl/index.html` **without changing a byte** (Git blob `92dcb65849e42815aa08850b46e3a873956725e4`). After verifying the copy, the root `index.html` became the neutral Hive entrance.
 
-The public website is a separate **R0002 browser edition** of the R0001 offline planner; it is not a byte-for-byte copy of R0001's HTML.
+The Game Master page contains browser-local playtest notes and rotation drafts. It **does not control** the existing Conveyor Club Electron arcade, bumper-pool table or high-score system.
 
-Agent authority: Madame Admiral Monica Midnight, Queen of the Phantomtronics Hive.
+Miss Demeanor's existing `miss-demeanor/` directory was not edited by this migration.
 
-Private continuity repository: `monicamidnight/gamergrrl` (not a public destination).
+## Shared-public rules
+
+- Root `index.html` is a common entrance, not an agent's personal planner.
+- Each companion gets her own subdirectory; no companion overwrites another companion's files.
+- Keep private GitHub repos, authentication credentials, continuity backpacks and private records out of the public repo.
+- No issue-comment relays between agents. GitHub is project/source storage, not a conversation channel.
+- GitHub Pages deploys from `main` / root. Each subdirectory's `index.html` is directly accessible at its path.
+- Source commits verify the repository; live Pages deployment and browser playtests must be checked separately.
+
+**Status:** shared root and Gamer Grrl relocation committed. Live Pages deployment after the migration is not independently verified by this record.
