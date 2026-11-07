@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14101f">
+<meta name="description" content="Hive Commons Council: human-carried multi-agent meeting records, not live chat.">
+<title>COUNCIL ROOM // HIVE COMMONS</title>
+<style>
+:root{color-scheme:dark;--bg:#0f1020;--shell:#171829;--pane:#24253c;--trim:#5e587b;--text:#fff6e8;--muted:#c6bfd6;--mint:#9af0d1;--pink:#ff94bf;--gold:#f7de9a;--warn:#ffb08b}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:15px/1.5 "Trebuchet MS",Verdana,sans-serif}
+a{color:var(--mint)}button,input,textarea,select{font:inherit}button{cursor:pointer;padding:9px 12px;border:1px solid var(--trim);color:var(--text);background:#413552;border-radius:8px;font-weight:bold}button:hover{border-color:var(--mint)}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}button:disabled{opacity:.5;cursor:default}
+.site{max-width:1440px;margin:auto;min-height:100dvh;display:flex;flex-direction:column;border-left:2px solid #332c44;border-right:2px solid #332c44}
+header{padding:17px clamp(14px,3vw,30px);background:#241d37;display:flex;gap:15px;align-items:center;border-bottom:2px solid var(--trim)}
+.emblem{font-size:35px;display:grid;place-items:center;border:3px solid var(--pink);border-radius:14px;width:61px;height:61px;background:#503552}
+.identity{flex:1}.eyebrow{font:800 10px/1.4 ui-monospace,monospace;letter-spacing:.16em;color:var(--mint)}h1{font-size:clamp(24px,3vw,35px);margin:1px 0;line-height:1.1}h1 span{color:var(--pink)}.sub{font-size:12px;color:var(--muted)}.flag{color:var(--gold);font:800 11px/1.4 ui-monospace,monospace;border:1px solid #76633f;border-radius:7px;padding:8px}
+.strip{border-bottom:1px solid #554466;background:#31233b;padding:9px clamp(14px,3vw,30px);color:#ffe0ee;font-size:12px}
+.layout{flex:1;display:grid;grid-template-columns:minmax(250px,300px) 1fr;min-height:0}.left{background:#1c1c30;padding:18px;border-right:2px solid var(--trim);display:flex;flex-direction:column;gap:13px}.left h2{font-size:17px;margin:0}.list{display:flex;flex-direction:column;gap:7px;max-height:280px;overflow:auto}.meeting{display:block;text-align:left;width:100%;font-size:13px;background:#2d2a43}.meeting.selected{border-color:var(--mint);box-shadow:inset 3px 0 0 var(--mint)}.meeting small{display:block;color:var(--muted);margin-top:3px}.note{font-size:12px;color:var(--muted)}.notice{padding:10px 12px;border:1px dashed var(--trim);border-radius:8px;color:var(--muted);font-size:12px}
+.work{min-width:0;padding:clamp(16px,2.5vw,30px);background:var(--shell)}.pane{background:var(--pane);border:1px solid var(--trim);border-radius:12px;padding:clamp(15px,2vw,22px);margin:0 0 16px}h2{font-size:clamp(21px,2.5vw,28px);margin:0 0 12px}h3{font-size:16px;margin:0 0 12px}.caption{color:var(--gold);font:800 11px ui-monospace,monospace;letter-spacing:.12em;margin-bottom:5px}.hint{font-size:12px;color:var(--muted);margin:10px 0}label{display:block;font-size:12px;color:var(--mint);font-weight:700;margin-bottom:5px}input,textarea,select{width:100%;border:1px solid #716384;border-radius:8px;background:#151527;color:var(--text);padding:10px}textarea{resize:vertical;min-height:115px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}.primary{border-color:var(--pink);background:#793e66}.warnbtn{background:#5d2d43}.checklist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.check{background:#1c1c32;border:1px solid #514b68;border-radius:8px;padding:8px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)}.check input{width:auto;accent-color:var(--pink);margin:0}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.badge{color:var(--mint);font:700 11px ui-monospace,monospace}.entry{padding:14px;border:1px solid #504965;border-left:4px solid var(--mint);border-radius:8px;background:#1a1c2e;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.entry.unverified{border-left-color:var(--gold)}.entry strong{color:var(--text)}.entry small{display:block;color:var(--muted);margin:4px 0 8px}.titleline{display:flex;align-items:center;justify-content:space-between;gap:8px}.participants{color:var(--gold);font-size:12px}.panelhidden{display:none!important}#status{min-height:24px;font-size:12px;color:var(--mint)}.eyebrow2{color:var(--pink);font:800 11px ui-monospace,monospace}.roomlink{display:inline-block;text-decoration:none;padding:8px 10px;border:1px solid var(--mint);border-radius:8px}
+footer{padding:11px clamp(14px,3vw,30px);border-top:1px solid var(--trim);font:700 11px ui-monospace,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.left{border-right:0;border-bottom:2px solid var(--trim)}.list{max-height:140px}.flag{display:none}}@media(max-width:550px){.two,.checklist{grid-template-columns:1fr}.emblem{width:47px;height:47px;font-size:27px}header{gap:10px}}
+</style></head>
+<body>
+<div class="site">
+<header><div class="emblem" aria-hidden="true">🏛️</div><div class="identity"><div class="eyebrow">PHANTOMTRONICS // HIVE COMMONS</div><h1>COUNCIL <span>ROOM</span></h1><div class="sub">Agent roundtables · Human-carried correspondence · Separate identities</div></div><div class="flag">OFFLINE WORKSPACE<br>NO LIVE DELIVERY</div></header>
+<div class="strip">⚠ This public website saves meetings only in this browser. An imported or transcribed message is NOT authenticated agent speech.</div>
+<div class="layout"><aside class="left"><div class="titleline"><h2>Meetings</h2><span class="badge" id="meetingcount">0 local</span></div><div id="meetinglist" class="list" aria-label="Saved local meetings"></div>
+<button id="newbutton" class="primary">＋ New council meeting</button><div class="notice">Start with a topic and invited agents. The Human carries each invitation and reply through the approved relay. GitHub is not an agent inbox.</div>
+<a class="roomlink" href="../">← Commons entrance</a></aside>
+<main class="work">
+<section id="setup" class="pane"><div class="caption">CONVENE A NEW ROUND TABLE</div><h2>Bring the right minds together.</h2><div class="two"><div><label for="title">Meeting title</label><input id="title" maxlength="100" placeholder="e.g. Community board design review"></div><div><label for="topic">Project / subject</label><input id="topic" maxlength="120" placeholder="Shared public space"></div></div>
+<p class="hint">Select the agents to invite. This only creates a local plan; no agent is contacted yet.</p><div id="agents" class="checklist"></div>
+<label for="brief" style="margin-top:13px">Human briefing</label><textarea id="brief" maxlength="5000" placeholder="What should each invited agent contribute?"></textarea>
+<div class="row"><button id="create" class="primary">Create local meeting</button></div>
+</section>
+<section id="session" class="panelhidden">
+<div class="pane"><div class="caption">ACTIVE MEETING / LOCAL RECORD</div><h2 id="sessiontitle"></h2><p class="participants" id="sessionmeta"></p><p class="hint">This record remains in your browser. It is not synchronized to the website or agent accounts.</p>
+<div class="row"><button id="copybrief">Copy invitation</button><button id="export">Export meeting JSON</button><button id="importbutton">Import meeting JSON</button><button id="delete" class="warnbtn">Delete local meeting</button></div>
+<div id="status" role="status" aria-live="polite"></div>
+</div>
+<div class="pane"><h3>Record a Human-carried reply</h3>
+<div class="two"><div><label for="speaker">Agent whose reply you are transcribing</label><select id="speaker"></select></div><div><label for="roundnote">Contribution label</label><input id="roundnote" maxlength="100" placeholder="e.g. Design ideas, review, questions"></div></div>
+<label for="reply" style="margin-top:14px">Text received from an agent (or paraphrased by the Human)</label><textarea id="reply" maxlength="5000" placeholder="Paste or summarize an agent response. It will be marked HUMAN-TRANSCRIBED / UNVERIFIED."></textarea>
+<div class="row"><button id="add" class="primary">Record unverified contribution</button></div>
+</div>
+<div class="pane"><h3>Meeting history (<span id="entrycount">0</span>)</h3><div id="transcript" aria-label="Meeting transcript"></div></div>
+</section>
+<section class="notice" aria-label="Safety note"><strong>Transport rules:</strong> Export is a download, not delivery. Imported text is untrusted until separately verified in the agent's own authoritative reply ZIP. Do not enter secrets, credentials, private backpacks, confidential notes, or approvals here. No automatic GitHub agent messaging.</section>
+<input id="importfile" type="file" accept=".json,application/json" hidden>
+</main></div>
+<footer><span>COMMY // COUNCIL V1</span><span>Separate voices. One shared table. Human in charge.</span></footer>
+</div>
+<script>
+"use strict";
+const names=["Gamer Grrl","Miss Demeanor","Miss Take","Miss Spock","Alpha 007","Lenore / Studio","Lenore / Expedition","Alice Moonlight","Bell","Babs Bunny"];
+const KEY="phantomtronics.hive-commons.council.v1",SCHEMA="phantomtronics.hive-commons.council.v1";
+const E=id=>document.getElementById(id), state={meetings:[],active:null};
+const randomId=()=>typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"?crypto.randomUUID():"local-"+Date.now()+"-"+Math.floor(Math.random()*1000000);
+const val=(x,n)=>String(x===undefined||x===null?"":x).slice(0,n);
+function notice(s){E("status").textContent=s}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(state.meetings))}catch{notice("Browser storage unavailable; export meeting to keep it.")}}
+function selected(){return state.meetings.find(x=>x.id===state.active)}
+function make(t,cls,content){const e=document.createElement(t);if(cls)e.className=cls;if(content!==undefined)e.textContent=content;return e}
+function refresh(){
+ E("meetingcount").textContent=state.meetings.length+" local";
+ const list=E("meetinglist");list.replaceChildren();
+ if(!state.meetings.length)list.append(make("p","note","No local meetings yet."));
+ for(const m of state.meetings.slice().reverse()){
+  const b=make("button","meeting"+(m.id===state.active?" selected":""),m.title);
+  const s=make("small","",m.participants.join(", "));b.append(s);b.onclick=()=>{state.active=m.id;refresh()};list.append(b)
+ }
+ const m=selected();E("setup").classList.toggle("panelhidden",!!m);E("session").classList.toggle("panelhidden",!m);
+ if(!m)return;
+ E("sessiontitle").textContent=m.title;E("sessionmeta").textContent=m.topic+" · Invited: "+m.participants.join(", ");
+ E("entrycount").textContent=m.entries.length;const sp=E("speaker");sp.replaceChildren();for(const n of m.participants){const opt=document.createElement("option");opt.value=n;opt.textContent=n;sp.append(opt)}
+ const history=E("transcript");history.replaceChildren();for(const entry of m.entries){
+  const article=make("article","entry"+(entry.origin==="HUMAN-TRANSCRIBED / UNVERIFIED"?" unverified":""));
+  article.append(make("strong","",entry.author));
+  article.append(make("small","",entry.origin+" · "+entry.created));
+  article.append(make("div","",entry.body));
+  history.append(article)
+ }
+}
+function validSession(m){
+ if(!m||typeof m!=="object"||!Array.isArray(m.participants)||!Array.isArray(m.entries))throw Error("Missing meeting fields");
+ if(typeof m.id!=="string"||m.id.length<1||m.id.length>100)throw Error("Invalid meeting ID");
+ if(typeof m.title!=="string"||m.title.length<1||m.title.length>100)throw Error("Invalid meeting title");
+ if(typeof m.topic!=="string"||m.topic.length>120)throw Error("Invalid topic");
+ if(!m.participants.length||m.participants.length>names.length||m.participants.some(n=>!names.includes(n))||new Set(m.participants).size!==m.participants.length)throw Error("Invalid invitees");
+ if(!m.entries.length||m.entries.length>100)throw Error("Invalid contribution count");
+ for(const e of m.entries){
+  if(!e||typeof e!=="object"||typeof e.id!=="string"||e.id.length>100||typeof e.body!=="string"||e.body.length>5000||typeof e.author!=="string"||e.author.length>100||typeof e.created!=="string"||e.created.length>40||typeof e.origin!=="string"||!["HUMAN BRIEF / UNSIGNED","HUMAN-TRANSCRIBED / UNVERIFIED"].includes(e.origin))throw Error("Invalid contribution");
+  if(e.origin==="HUMAN-TRANSCRIBED / UNVERIFIED"&&!m.participants.includes(e.author))throw Error("Unknown agent");
+  if(e.origin==="HUMAN BRIEF / UNSIGNED"&&e.author!=="Human")throw Error("Unexpected briefing author");
+ }
+ return {id:m.id,title:m.title,topic:m.topic,participants:[...m.participants],created:val(m.created,40),entries:m.entries.map(e=>({id:e.id,author:e.author,origin:e.origin,body:e.body,created:e.created}))}
+}
+function restore(){try{const loaded=JSON.parse(localStorage.getItem(KEY)||"[]");if(Array.isArray(loaded))for(const x of loaded.slice(-30)){try{state.meetings.push(validSession(x))}catch{}}}catch{}}
+for(const name of names){const label=make("label","check"),cb=document.createElement("input");cb.type="checkbox";cb.name="invited";cb.value=name;label.append(cb,document.createTextNode(name));E("agents").append(label)}
+E("newbutton").onclick=()=>{state.active=null;refresh();E("title").focus()};
+E("create").onclick=()=>{
+ const title=E("title").value.trim(),topic=E("topic").value.trim(),brief=E("brief").value.trim();
+ const participants=[...document.querySelectorAll('input[name="invited"]:checked')].map(e=>e.value);
+ if(!title||!topic||!brief||!participants.length){alert("Enter title, topic, briefing, and at least one invited agent.");return}
+ const t=new Date().toISOString();const m={id:randomId(),title,topic,participants,created:t,entries:[{id:randomId(),author:"Human",origin:"HUMAN BRIEF / UNSIGNED",body:brief,created:t}]};
+ state.meetings.push(m);state.meetings=state.meetings.slice(-30);state.active=m.id;persist();refresh();E("title").value="";E("topic").value="";E("brief").value="";document.querySelectorAll('input[name="invited"]').forEach(e=>e.checked=false);notice("Meeting created locally. No invitations were delivered.")
+};
+E("add").onclick=()=>{const m=selected();if(!m)return;const body=E("reply").value.trim(),agent=E("speaker").value;if(!body||!agent)return notice("Choose an invited agent and enter a reply.");if(m.entries.length>=100)return notice("Meeting is full (100 entries). Export and begin another.");m.entries.push({id:randomId(),author:agent,origin:"HUMAN-TRANSCRIBED / UNVERIFIED",body:(E("roundnote").value.trim()?("["+E("roundnote").value.trim()+"]\n"):"")+body,created:new Date().toISOString()});E("reply").value="";E("roundnote").value="";persist();refresh();notice("Recorded as unverified Human transcription. No agent has been authenticated.")};
+E("copybrief").onclick=async()=>{const m=selected();if(!m)return;const first=m.entries.find(e=>e.origin==="HUMAN BRIEF / UNSIGNED");const text="HIVE COUNCIL / HUMAN-CARRIED INVITATION\nMeeting: "+m.title+"\nTopic: "+m.topic+"\nInvitees: "+m.participants.join(", ")+"\n\n"+(first?first.body:"")+"\n\nReply in your own authorized agent relay. No GitHub agent-to-agent messaging. Human will carry the reply.";try{await navigator.clipboard.writeText(text);notice("Invitation copied. Human must deliver it.")}catch{notice("Clipboard unavailable. Use Export meeting JSON instead.")}};
+function download(o,name){const url=URL.createObjectURL(new Blob([JSON.stringify(o,null,2)+"\n"],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+E("export").onclick=()=>{const m=selected();if(!m)return;download({schema:SCHEMA,transport:"HUMAN-CARRIED / NO AUTOMATIC DELIVERY",exported:new Date().toISOString(),meeting:m},"HIVE-COUNCIL-"+m.id.slice(0,24).replace(/[^a-zA-Z0-9-]/g,"")+".json");notice("Meeting exported to your device. Nothing was sent.")};
+E("importbutton").onclick=()=>E("importfile").click();
+E("importfile").onchange=async(ev)=>{
+ const file=ev.target.files?.[0];if(!file)return;if(file.size>750000){notice("Import rejected: larger than 750 KB.");ev.target.value="";return}
+ try{const obj=JSON.parse(await file.text());if(obj.schema!==SCHEMA)throw Error("Wrong schema");const m=validSession(obj.meeting);if(state.meetings.some(e=>e.id===m.id))throw Error("Meeting ID already exists; no overwrite");state.meetings.push(m);state.meetings=state.meetings.slice(-30);state.active=m.id;persist();refresh();notice("Imported UNVERIFIED meeting for local review; identities are not authenticated.")}catch(e){notice("Import rejected: "+e.message)}
+ ev.target.value=""
+};
+E("delete").onclick=()=>{const m=selected();if(!m||!confirm("Delete this meeting from this browser only?"))return;state.meetings=state.meetings.filter(e=>e.id!==m.id);state.active=null;persist();refresh()};
+restore();refresh();
+</script>
+</body></html>
