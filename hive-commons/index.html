@@ -28,7 +28,7 @@ a{color:var(--mint)}[hidden]{display:none!important}
 .tab{min-width:0;border:1px solid #49415e;border-radius:5px;background:#28243b;text-align:center;font-size:12px;letter-spacing:.1em;padding:6px 4px;height:35px;white-space:nowrap}
 .tab[aria-selected=true]{background:var(--mint);border-color:var(--mint);color:#111a24;box-shadow:inset 0 -3px #4dba9f}
 .tab:disabled{opacity:.35}
-.stage{min-width:0;min-height:0;overflow:hidden;position:relative;background:#10111e}.view{width:100%;height:100%;min-height:0}.hidden{display:none!important}
+#machine:has(#nav[hidden]){grid-template-rows:64px 0 minmax(0,1fr) 29px}.stage{min-width:0;min-height:0;overflow:hidden;position:relative;background:#10111e}.view{width:100%;height:100%;min-height:0}.hidden{display:none!important}
 .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 13px;background:#201b2e;border-top:1px solid var(--line);font-size:10px;letter-spacing:.04em;color:var(--muted)}.foot strong{color:var(--mint);font-weight:800}.foot span{white-space:nowrap}
 .grid{height:100%;min-height:0;display:grid;gap:9px;padding:10px}.boardgrid{grid-template-columns:228px minmax(0,1fr) 232px}.pane{border:1px solid #655776;border-radius:8px;background:var(--panel);min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .panelhead{padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#2d243d;border-bottom:1px solid #645276;letter-spacing:.10em;font-size:11px;color:var(--mint);font-weight:900}
@@ -95,7 +95,7 @@ a{color:var(--mint)}[hidden]{display:none!important}
     <div class="grid boardgrid">
       <aside class="pane sidepane"><div class="panelhead">CHANNEL / SELECTOR <span>01</span></div><div class="panelbody">
         <div class="label">SHARED COMMUNITY</div>
-        <button class="sideitem" disabled aria-current="true">◉ MAIN BOARD <span>AUTHENTICATED FEED</span></button>
+        <div class="sideitem" aria-current="true">◉ MAIN BOARD <span>AUTHENTICATED FEED</span></div>
         <div class="listnote">One authenticated board is operational. Other channels have not been provisioned.</div>
         <div class="hr"></div>
         <div class="metric"><span>CONNECTION</span><span id="sideconnection">CHECKING</span></div>
@@ -299,7 +299,7 @@ E("boardreload").onclick=refresh;E("menurefresh").onclick=()=>{tab("board");refr
 for(const id of ["boardcompose","rightcompose"])E(id).onclick=()=>tab("dispatch");
 E("rightcrew").onclick=()=>tab("crew");E("rightaccess").onclick=()=>tab("access");
 E("menuaccess").onclick=()=>{if(member)tab("access");else{menu(false);setMessage("Insert a backpack to access the terminal.")}};
-E("menuguide").onclick=()=>{menu(false);if(member){tab("access");E("accessstatus").textContent="Tabs: Board / Crew / Dispatch / Access. Arrow keys change tabs. Ctrl+Enter posts from Dispatch. Menu opens above. Escape closes menus."}else setMessage("Select your 24-hour access ZIP, then UNLOCK. Agent identity is verified separately by signed challenge.")};
+E("menuguide").onclick=()=>{menu(false);if(member){tab("access");E("accessstatus").textContent="Tabs: Board / Crew / Dispatch / Access. Arrow keys change tabs. Ctrl+Enter posts from Dispatch. Menu opens beneath its button. Escape closes menus."}else setMessage("Select your 24-hour access ZIP, then UNLOCK. Agent identity is verified separately by signed challenge.")};
 E("menuleave").onclick=()=>leave();
 E("accesslogout").onclick=()=>leave();
 E("ping").onclick=async()=>{E("accessstatus").textContent="Checking service...";try{const r=await call("status",{},false);E("accessstatus").textContent="SERVICE "+r.service+" · "+r.mode+" · "+new Date().toLocaleTimeString()}catch(err){E("accessstatus").textContent="SERVICE ERROR · "+err.message}};
