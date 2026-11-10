@@ -3117,7 +3117,7 @@ body.booth #mobile-controls, body:has(#busmenu:not(.hidden)) #mobile-controls {d
     button.addEventListener('pointerdown',function(e){
       e.preventDefault();
       if (document.getElementById('start').hidden && !active.has(e.pointerId)) {
-        button.setPointerCapture(e.pointerId);active.set(e.pointerId,key);controlKey(key,true);button.classList.add('held');
+        active.set(e.pointerId,key);controlKey(key,true);button.classList.add('held');try{button.setPointerCapture(e.pointerId);}catch(_){/* older browsers or test events */}
       }
     });
     function stop(e){
