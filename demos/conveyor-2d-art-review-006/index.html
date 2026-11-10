@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0e14"><title>Conveyor Club · Original 2D Night City</title>
+<style>
+:root{color-scheme:dark;font-family:ui-monospace,Consolas,monospace;background:#0c0f15;color:#e1dcd1}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}body{display:flex;flex-direction:column;min-height:100dvh;max-height:100dvh}
+header{background:#141820;border-bottom:2px solid #9d668b;display:flex;align-items:center;justify-content:space-between;gap:9px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top))}
+header b{font-size:14px;color:#e8a0c3}header small{display:block;font-size:10px;color:#a4a6a8}
+button{font:700 13px ui-monospace,monospace;background:#232832;border:1px solid #6e7076;border-radius:3px;padding:10px;color:#f0dfb5;min-height:42px;touch-action:manipulation}
+#world.zoom{position:relative;display:block}
+#world.zoom #game{position:absolute;width:200%;max-width:none;max-height:none;height:auto}
+button:active{background:#a65f28;color:white}button:focus-visible{outline:2px solid #f6c45e}
+#world{flex:1;min-height:0;background:#090c12;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#game{display:block;width:min(100%,calc((100dvh - 240px)*1.62));height:auto;max-height:100%;image-rendering:pixelated;touch-action:none;box-shadow:0 0 0 1px #4a4d55}
+#hud{padding:8px 12px;font-size:11px;background:#191d26;border-top:1px solid #41454b;min-height:46px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+#currentLocation{font-size:12px;font-weight:800;color:#e8a0c3}#inspector{color:#b4b4b6;max-width:55ch}
+#controls{height:145px;background:#10131b;display:flex;justify-content:center;gap:20px;padding:6px 12px calc(8px + env(safe-area-inset-bottom));align-items:center;flex-shrink:0}
+#dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,42px);gap:3px;touch-action:none}#dpad button{padding:0;min-height:41px;font-size:19px;background:#263344;border-color:#596b7e}#dpad #world.zoom{position:relative;display:block}
+#world.zoom #game{position:absolute;width:200%;max-width:none;max-height:none;height:auto}
+button:active{background:#8d512b}
+#tips{font-size:11px;max-width:186px;line-height:1.5;color:#c6b6a2}
+#notice{color:#e8b17e;min-height:16px}#gameStatusText{display:none}
+@media(max-width:420px){#world{padding:0}#game{width:100%;height:auto}#inspector{display:none}#controls{gap:8px}#tips{max-width:145px}header b{font-size:12px}}
+</style>
+</head><body>
+<header><div><b>CONVEYOR CLUB · 2D NIGHT CITY</b><small>ORIGINAL 2D · CITY EXTERIOR ART TEST 006</small></div><div style="display:flex;gap:5px"><button id="zoomBtn" type="button">ZOOM 2X</button><button id="startCity" type="button">EXPLORE CITY</button></div></header>
+<main id="world"><canvas id="game" width="1088" height="672" aria-label="Interactive pixel-art city with traffic and residents"></canvas></main>
+<section id="hud"><div><div id="currentLocation">RIVERFRONT → BIG CITY</div><div id="notice" role="status">Tap EXPLORE CITY · art preview</div></div><div id="inspector">Old Town exterior · rebuilt to match Conveyor Club's original pixel-art style</div></section>
+<section id="controls" aria-label="Move around the city"><div id="dpad"><span></span><button data-dir="up" aria-label="Walk north">▲</button><span></span><button data-dir="left" aria-label="Walk west">◀</button><button id="stop" aria-label="Stop moving">■</button><button data-dir="right" aria-label="Walk east">▶</button><span></span><button data-dir="down" aria-label="Walk south">▼</button><span></span></div>
+<div id="tips">Walk the marked crosswalks. Follow the exit arrows between city blocks. <strong>Find your own way back to the club.</strong><div id="trafficHUD"></div></div></section>
+
+<script>
+'use strict';
+const W=34,H=21,S=32,canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const q=id=>document.getElementById(id),entities=[];
+let player={x:2.5,y:8.5,zone:'outside',role:'rockstar',name:'MONICA',facing:'down',active:true,color:'#d14e6b',id:'player',path:[],speed:4};
+let talkingTo=null,approach=null,selected=null,hovered=null,moveTrail=null,simPaused=false,simSpeed=1,elapsed=0,lastTime=0;
+let tick=function(){},render=function(){};
+function notice(text){q('notice').textContent=String(text)}
+function endTalk() {talkingTo=null;}
+function targetRobot(a){q('inspector').textContent=`${a.name}: ${a.narrative}`;notice(a.name+' · city resident');}
+function createEntity(name,role,color,x,y,id){return{name,role,color,x:x+.5,y:y+.5,id,zone:'club',path:[],active:true,speed:1.2,facing:'down',task:'idle',dwell:5,phase:0};}
+function walk(x,y,actor){return !!window.CC_CITY?.walk(actor.zone,x,y,actor)}
+function pathfind(from,to){const sx=Math.floor(from.x),sy=Math.floor(from.y),ex=Math.floor(to.x),ey=Math.floor(to.y);if(!walk(ex,ey,from))return[];
+ const start=sx+','+sy,goal=ex+','+ey,seen=new Set([start]),q0=[[sx,sy]],prev=new Map();let ix=0;
+ while(ix<q0.length&&ix<900){const [x,y]=q0[ix++],k=x+','+y;if(k===goal){const arr=[];let at=goal;while(at!==start){const [xx,yy]=at.split(',').map(Number);arr.unshift({x:xx+.5,y:yy+.5});at=prev.get(at);if(!at)return[];}return arr;}
+ for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,nk=nx+','+ny;if(seen.has(nk)||!walk(nx,ny,from))continue;seen.add(nk);prev.set(nk,k);q0.push([nx,ny]);}}
+ return[];
+}
+function go(x,y){if(!walk(x,y,player)){notice('BLOCKED · FIND THE CROSSWALK');return false;}const path=pathfind(player,{x,y});if(path.length){player.path=path;moveTrail={x,y};return true;}return false;}
+function moveEntity(a,dt){if(!a.path?.length)return;const target=a.path[0],dx=target.x-a.x,dy=target.y-a.y,d=Math.hypot(dx,dy),spd=a===player?5.2:a.speed;
+ if(d<spd*dt+.05){a.x=target.x;a.y=target.y;a.path.shift();if(a===player&&!a.path.length)moveTrail=null;}
+ else{const step=spd*dt;a.x+=dx/d*step;a.y+=dy/d*step;}a.facing=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up');
+}
+function drawRobot(a,t,isPlayer){const x=Math.round(a.x*S),y=Math.round(a.y*S);
+ // Deterministic code-drawn robot matching the pixel vocabulary of the 2D game.
+ ctx.fillStyle='#141820';ctx.fillRect(x-10,y-14,20,20);
+ ctx.fillStyle=a.color||'#b18452';ctx.fillRect(x-8,y-13,16,15);
+ ctx.fillStyle='#152d3c';ctx.fillRect(x-6,y-10,12,6);
+ ctx.fillStyle='#84d8ec';ctx.fillRect(x-4,y-8,3,3);ctx.fillRect(x+2,y-8,3,3);
+ ctx.fillStyle='#292a2e';ctx.fillRect(x-7,y+2,5,5);ctx.fillRect(x+2,y+2,5,5);
+ if(isPlayer){ctx.strokeStyle='#ffd044';ctx.lineWidth=2;ctx.strokeRect(x-12,y-17,24,27);ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.fillStyle='#ffd044';ctx.fillText('YOU',x,y-23);}
+}
+window._ccBootReady=true;
+window.clubArcade={close(){}};
+window.ccSaveWorldNow=()=>{try{localStorage.setItem('cc-2d-demo-location',JSON.stringify({zone:player.zone,x:player.x,y:player.y}));}catch{}};
+window.CC_EDSEL={visit(){notice('Edsel plant is available in the full Quin cartridge.');return false;}};
+</script>
+<script>
+/* THE CONVEYOR CLUB / CITY ART 006 — Exterior-scene visual vocabulary.
+ * Artwork only: world collision, traffic, residents and provider modules stay unchanged.
+ * Original club exterior reference: layered masonry, riveted steel, recessed blue
+ * glazing, physically mounted signs, uneven paving, restrained neon and shadows.
+ */
+'use strict';
+(()=>{
+const C={
+ bg:'#161c29',night:'#101622',wall:'#262839',asphalt:'#202635',road2:'#242a39',
+ seam:'#323747',walk:'#303243',stone:'#424454',stone2:'#515164',edge:'#717181',
+ brick:'#39283a',brickLine:'#4c3448',brickMid:'#4b354b',brickDark:'#2a2436',
+ mortar:'#2a2533',metal:'#64717c',steel:'#788591',shine:'#b3aab0',
+ window:'#173342',glass:'#2b5e70',reflection:'#6994a4',door:'#172a39',
+ magenta:'#d76c9c',neon:'#f294ba',cyan:'#65bfcd',gold:'#dbac6b',
+ yellow:'#d2aa64',white:'#c6c5c7',rust:'#8b493c',bronze:'#956851',
+ green:'#57aa80',dark:'#0e1320'
+};
+function rect(g,x,y,w,h,c){if(w<=0||h<=0)return;g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
+function text(g,s,x,y,size=12,c=C.white,align='center'){
+ g.font=`bold ${size}px monospace`;g.textBaseline='middle';g.textAlign=align;
+ g.fillStyle=C.dark;g.fillText(s,x+2,y+2);g.fillStyle=c;g.fillText(s,x,y);
+}
+function hash(a,b,c,d){let z=(((a+7)*73856093)^((b+9)*19349663)^((c+1)*83492791)^((d+3)*1664525))>>>0;z=Math.imul(z^(z>>>16),2246822507);return(z^(z>>>13))>>>0;}
+const variations={
+ shabby:{body:'#39283a',grout:'#4e3749',roof:'#242634',trim:'#89536c',lamp:'#d18d83'},
+ shop:{body:'#3b3140',grout:'#534354',roof:'#232b37',trim:'#638a99',lamp:'#dfb582'},
+ office:{body:'#353d4d',grout:'#495164',roof:'#222b3c',trim:'#647b95',lamp:'#86c0c7'},
+ tower:{body:'#3c3447',grout:'#504256',roof:'#202637',trim:'#8c6379',lamp:'#ad95bf'},
+ house:{body:'#3c3542',grout:'#544453',roof:'#282838',trim:'#94735f',lamp:'#e6b781'},
+ mall:{body:'#393247',grout:'#57435c',roof:'#29253c',trim:'#aa557b',lamp:'#eaa987'}
+};
+function paintBuilding(g,b,m,t){
+ const S=32,x=b.x*S,y=b.y*S,w=b.w*S,h=b.h*S,hz=hash(m.r,m.c,b.x,b.y);
+ const base=variations[b.kind]||variations.shop;
+ const storeTones={
+  RECORDS:{body:'#39283a',grout:'#4e3749',trim:'#995c87'},
+  LAUNDRY:{body:'#303c48',grout:'#455567',trim:'#5c8795'},
+  'BAIL BONDS':{body:'#443137',grout:'#66434a',trim:'#a05b66'},
+  PAWN:{body:'#47362f',grout:'#5c473d',trim:'#94704d'},
+  DINER:{body:'#423039',grout:'#674050',trim:'#bd7069'},
+  DONUTS:{body:'#3e3046',grout:'#55435e',trim:'#985677'}
+ };
+ const v={...base,...(storeTones[b.caption]||{})};
+ const signY=y+h-80;
+ // Keep the actual facade inside the collidable footprint; cast shadow may
+ // spill slightly onto surrounding paving but never pretends to be a wall.
+ rect(g,x+10,y+14,w-8,h-4,'#101420');
+ rect(g,x,y+9,w,h-11,v.body);rect(g,x+7,y+17,w-14,h-23,v.grout);
+ rect(g,x-2,y+4,w+4,13,C.night);rect(g,x+3,y+5,w-6,6,C.steel);
+ rect(g,x+10,y+11,w-20,3,v.trim);
+ rect(g,x+6,y+18,w-12,3,'#252634');
+ // Brickwork repeats the club's outside façade masonry bond and grime flecks.
+ for(let row=y+27,k=0;row<signY-3;row+=11,k++){
+   rect(g,x+7,row,w-14,2,v.body);
+   for(let p=x+11+(k%2)*17;p<x+w-9;p+=34){
+     rect(g,p,row+2,2,8,'#2a2433');
+     if(hash(m.r,m.c,p,row)%7===0)rect(g,p+5,row+5,11,1,'#665163');
+   }
+ }
+ // Roof superstructure: staggered HVACs, flashings, and service ducts.
+ for(let i=0;i<3;i++){
+  const vx=x+22+i*(w-52)/3,iy=y+14+(i%2)*2;
+  rect(g,vx,iy,36,10,'#1c2532');rect(g,vx+3,iy-3,30,5,'#667582');
+  for(let f=0;f<4;f++)rect(g,vx+5+f*7,iy+3,3,3,'#354655');
+ }
+ // Cladding side pillars and drainpipes.
+ rect(g,x+4,y+22,7,h-34,'#282838');rect(g,x+w-10,y+22,6,h-34,'#292838');
+ rect(g,x+w-18,y+17,3,h-23,'#5a5763');
+ for(let j=0;j<5;j++)rect(g,x+w-21,y+22+j*23,10,3,'#343743');
+ // Upper window bays vary by building family and seed, as in the club exterior.
+ const count=b.kind==='house'?2:(b.kind==='tower'?4:(hz%3===0?2:3));
+ const gap=(w-34)/count;
+ for(let i=0;i<count;i++){
+   const wx=x+19+i*gap, wy=y+26+(hz%3===1?2:0),ww=gap-12,wh=b.kind==='house'?35:36;
+   rect(g,wx-4,wy+4,ww+8,wh+5,'#151b2b');
+   rect(g,wx-3,wy,ww+6,wh+3,C.metal);rect(g,wx+2,wy+4,ww-4,wh-8,C.window);
+   rect(g,wx+5,wy+7,ww-10,12,C.glass);rect(g,wx+5,wy+19,ww-10,3,'#335066');
+   rect(g,wx+ww-8,wy+7,4,wh-17,C.reflection);
+   rect(g,wx+ww*.53,wy+4,3,wh-8,'#243548');
+   rect(g,wx-3,wy+wh+2,ww+6,5,'#6a5868');
+   if((hz+i)%3===0){rect(g,wx+7,wy+11,ww-17,12,'#b49a72');rect(g,wx+7,wy+22,ww-17,4,'#766c63');}
+   if(b.kind==='house'){
+     rect(g,wx-6,wy-6,ww+12,4,'#8b625c');
+     rect(g,wx-6,wy+wh+7,ww+12,3,'#49485b');
+   }
+ }
+ // Awning/canopy and its physically supported shadow.
+ if(b.kind!=='house'){
+ rect(g,x+12,signY-9,w-24,11,C.night);
+ rect(g,x+11,signY-14,w-22,7,v.trim);
+ rect(g,x+15,signY-11,w-30,2,C.metal);
+ if(b.kind==='shop'||b.kind==='mall'){
+   for(let j=0;j<8;j++)rect(g,x+16+j*(w-33)/8,signY-7,(w-33)/16,8,j%2?v.trim:'#252936');
+ }
+ // Highly legible mounted store sign, not plain yellow words floating in a box.
+ const signX=x+30,signW=w-60;
+ rect(g,signX-6,signY+7,signW+12,35,'#11151f');
+ rect(g,signX-2,signY+3,signW+4,33,v.trim);
+ rect(g,signX+2,signY+7,signW-4,25,C.night);
+ const signColor=b.caption==='RECORDS'||b.caption==='CINEMA'?C.neon:
+   b.caption==='LAUNDRY'||b.caption==='HOTEL'?C.cyan:
+   b.caption==='BAIL BONDS'||b.caption==='PAWN'?C.gold:
+   b.caption==='DINER'||b.caption==='DONUTS'?C.neon:C.white;
+ text(g,b.caption,x+w/2,signY+20,b.caption.length>12?12:16,signColor);
+ }else{
+  // Houses have entry porches and number plaques instead of shop signs.
+  rect(g,x+8,y+74,w-16,5,'#6b5264');
+  rect(g,x+w/2-13,y+75,26,23,'#171d2c');
+  text(g,'NO. '+String((hz%75)+10),x+w/2,y+86,10,C.gold);
+ }
+ // Left sconce and entry: deep glass, threshold, brass handles and roof trim.
+ for(const side of [x+13,x+w-20]){
+   rect(g,side,signY+10,7,13,'#554b5d');rect(g,side+1,signY+13,5,5,v.lamp);
+   rect(g,side-3,signY+26,13,2,'#302c3b');
+ }
+ const dx=x+w/2-27,dy=y+h-7;
+ rect(g,dx-7,dy-38,68,47,'#101623');rect(g,dx-2,dy-35,58,40,'#655569');
+ rect(g,dx+2,dy-32,24,35,C.glass);rect(g,dx+30,dy-32,23,35,'#173446');
+ rect(g,dx+26,dy-32,4,36,'#a78090');
+ for(const xx of [dx+2,dx+31]){rect(g,xx+5,dy-29,15,3,'#579aad');rect(g,xx+10,dy-18,2,7,'#daa980');}
+ rect(g,dx-5,dy+7,65,3,'#85808a');
+ // Business-specific prop accents; not decorations that pretend to be doors.
+ if(b.caption==='RECORDS'){
+   rect(g,x+20,signY+6,28,30,'#1c2030');
+   g.fillStyle='#bc7c9c';g.beginPath();g.arc(x+35,signY+20,10,0,Math.PI*2);g.fill();
+   g.fillStyle='#18212a';g.beginPath();g.arc(x+35,signY+20,5,0,Math.PI*2);g.fill();
+ }else if(b.caption==='DINER'||b.caption==='COFFEE'){
+   rect(g,x+24,signY+37,35,5,'#b9807a');rect(g,x+29,signY+30,25,8,'#304452');
+ }else if(b.caption==='LAUNDRY'){
+   for(let i=0;i<2;i++){rect(g,x+20+i*34,signY+8,28,26,'#647c86');
+    g.strokeStyle='#17283b';g.lineWidth=4;g.beginPath();g.arc(x+34+i*34,signY+21,8,0,Math.PI*2);g.stroke();}
+ }else if(b.kind==='tower'||b.kind==='office'){
+   for(let i=0;i<3;i++)rect(g,x+25+i*24,y+27,18,3,C.metal);
+ }
+ // Staggered riveted steel fascia at the building's base.
+ rect(g,x+4,y+h-6,w-8,5,'#1b202d');
+ for(let i=0;i<10;i++)rect(g,x+12+i*(w-24)/10,y+h-4,3,2,C.steel);
+}
+function street(g,t,m,W,H,S,signal){
+ const R=(x,y,w,h,c)=>rect(g,x,y,w,h,c);
+ const seed=(x,y)=>hash(m.r,m.c,x,y);
+ g.imageSmoothingEnabled=false;
+ R(0,0,W*S,H*S,C.bg);
+ // Square-grid walks, but with the original club's paver joins and wear.
+ for(let y=1;y<20;y++)for(let x=1;x<33;x++){
+   const road=(x>=15&&x<=18)||(y>=9&&y<=11),z=seed(x,y),px=x*S,py=y*S;
+   R(px,py,S,S,road?(z%5===0?C.road2:C.asphalt):(z%6===0?'#373645':C.walk));
+   if(road){if(z%9===0)R(px+5,py+22,12,1,'#383a4c');}
+   else{
+    R(px+1,py+30,30,2,z%3===0?'#454454':'#3e4051');
+    if((x+y)%2===0)R(px+30,py+5,2,23,'#3b3e4d');
+    if(z%7===0)R(px+4,py+7,16,1,'#54505c');
+    if(z%19===0)R(px+19,py+14,4,2,'#232632');
+   }
+ }
+ // Dark road channels, raised curbs and broken amber center lines.
+ R(15*S,1*S,4*S,19*S,'#222734');R(1*S,9*S,32*S,3*S,'#242936');
+ for(let yy=1;yy<20;yy++)for(let xx=1;xx<33;xx++){
+   if(!(xx>=15&&xx<=18||yy>=9&&yy<=11))continue;
+   const z=seed(xx+17,yy+31);
+   if(z%9===0)R(xx*S+4,yy*S+16,14,1,'#353b4b');
+   if(z%13===0)R(xx*S+22,yy*S+7,5,1,'#333c48');
+ }
+ for(let i=0;i<22;i++){
+   const yy=i*S;
+   if(i%3!==1&&i!==10)R(17*S-2,yy+6,3,18,C.yellow);
+ }
+ for(let i=1;i<33;i++)if(i%3!==1&&i!==16)R(i*S+5,10*S+14,19,3,C.yellow);
+ // Thick pedestrian crossings on precisely the same traversable grid tiles.
+ for(const x of [7,26])for(let k=0;k<5;k++){
+   R((x-2)*S+k*17,9*S+5,9,3*S-10,k%2?C.white:'#d1c8b6');
+ }
+ for(const y of [6,16])for(let k=0;k<4;k++){
+   R(15*S+8,y*S-17+k*17,4*S-14,8,k%2?C.white:'#cac5bc');
+ }
+ // Curbs and drainage channels are at the exact paint/collision boundary.
+ for(const x of [15,19]){
+  R(x*S-3,32,4,9*S-32,'#5c5a65');R(x*S-3,12*S,4,8*S,'#5c5a65');
+  for(let y of [2,4,7,14,16,18])R(x*S-8,y*S,10,3,'#3d424c');
+ }
+ for(const y of [9,12]){
+   R(32,y*S-4,14*S-32,4,'#64616a');R(19*S,y*S-4,14*S,4,'#64616a');
+   for(let xx of [3,5,11,23,29])R(xx*S,y*S-7,26,4,'#373948');
+ }
+ // Pipe runs, drain gratings, utility covers and bright rain specks.
+ for(let i=0;i<12;i++){
+  const xx=2+((i*11+7)%29),yy=2+((i*7+3)%17);
+  if(xx>=15&&xx<=18||yy>=9&&yy<=11)continue;
+  const px=xx*S+8,py=yy*S+8;
+  R(px,py,17,9,'#202a36');R(px+2,py+2,13,5,'#465160');
+  for(let j=0;j<4;j++)R(px+4+j*3,py+3,1,4,'#1b2735');
+ }
+ for(let i=0;i<22;i++){
+  const x=(hash(m.r,m.c,i,19)%1024)+32,y=(hash(m.r,m.c,i,35)%590)+40;
+  if(x>15*S&&x<19*S||y>9*S&&y<12*S)continue;
+  R(x,y,7+(i%3)*5,1,i%4===0?'#6a6172':'#4a475c');
+ }
+ // Tiny pool of neon reflection from lit windows, as in riverfront pavement.
+ for(const b of m.buildings){
+   const baseX=b.x*S+b.w*S/2,py=(b.y+b.h)*S+6;
+   if(py>H*S-26)continue;
+   for(let i=0;i<5;i++)R(baseX-25+i*8,py+i*3,9+(i%2)*6,1,i%3===0?'#665069':'#3f4c5d');
+ }
+ // Original precinct-style border, slightly recessed from the screen edge.
+ R(0,0,W*S,31,C.night);R(0,(H-1)*S,W*S,S,C.night);
+ R(0,0,31,H*S,C.night);R((W-1)*S,0,S,H*S,C.night);
+ for(let i=1;i<W-1;i++){
+  R(i*S+4,6,21,3,'#293142');R(i*S+4,(H-1)*S+7,21,2,'#293142');
+ }
+ for(let i=1;i<H-1;i++){
+  R(7,i*S+5,3,22,'#283343');R((W-1)*S+7,i*S+5,3,22,'#283343');
+ }
+ // Shadow-bevelled stoplights mimic the club's steel fixtures.
+ const phase=signal();
+ function lamp(x,y,state){
+  R(x-8,y-18,17,42,'#121723');R(x-6,y-19,13,39,'#5b6270');R(x-4,y-16,9,35,'#171d2a');
+  const colors={R:'#d05f68',Y:'#d4b170',G:'#5bb8a1'};
+  ['R','Y','G'].forEach((k,i)=>{R(x-2,y-13+i*10,6,7,state===k?colors[k]:'#343640');
+   if(state===k)R(x-3,y-14+i*10,8,2,colors[k]);});
+  R(x-6,y+21,14,3,'#30333f');
+ }
+ lamp(14*S-14,8*S+10,phase.ns);lamp(20*S+12,13*S-10,phase.ew);
+ if(m.kind==='parking'){
+  for(let i=0;i<7;i++){
+   const x=80+i*140;
+   if(x>15*S&&x<19*S)continue;
+   R(x,70,3,70,'#8d8e94');R(x,520,3,63,'#8d8e94');
+  }
+ }
+}
+function drawExits(g,m,S,exits){
+ const R=(x,y,w,h,c)=>rect(g,x,y,w,h,c);
+ for(const p of exits){
+  const nr=m.r+p.dy,nc=m.c+p.dx,valid=nr>=0&&nr<6&&nc>=0&&nc<4;
+  const special=m.r===5&&m.c===0&&p.dx<0?'CLUB':m.r===5&&m.c===3&&p.dx>0?'EDSEL':null;
+  const c=valid||special?'#3f7787':'#554759';
+  const x=p.x*S,y=p.y*S;
+  R(x+3,y+4,27,25,C.night);R(x+5,y+5,24,21,c);R(x+8,y+7,18,2,'#a3b0b8');
+  text(g,p.dx<0?'‹':p.dx>0?'›':p.dy<0?'▲':'▼',x+17,y+17,15,C.gold);
+ }
+}
+function drawCar(g,{x,y,horizontal,color,braking=false,seed=0}){
+ const R=(a,b,w,h,c)=>rect(g,a,b,w,h,c),shade='#141925';
+ if(horizontal){
+   R(x-25,y-11,52,22,shade);R(x-23,y-8,48,17,'#11151f');
+   for(const xx of [x-17,x+14]){R(xx,y-11,8,4,'#11151c');R(xx,y+8,8,4,'#11151c');}
+   R(x-22,y-9,44,18,color);R(x-20,y-5,40,10,'#2c3d51');
+   R(x-9,y-6,19,12,'#162f40');R(x-7,y-4,14,8,'#497689');
+   R(x-17,y-8,4,16,'#777e86');R(x+12,y-8,3,16,'#b0a1a2');
+   R(x+(braking?-24:20),y-7,4,4,braking?'#f27283':'#ddc897');
+   R(x+(braking?-24:20),y+4,4,4,braking?'#f27283':'#ddc897');
+   if(seed%3===0)R(x-4,y-9,11,2,'#aea8a0');
+ }else{
+   R(x-12,y-27,24,56,shade);
+   for(const yy of [y-18,y+10]){R(x-13,yy,4,9,'#0e121a');R(x+9,yy,4,9,'#0e121a');}
+   R(x-9,y-23,19,48,color);R(x-7,y-20,15,44,'#293949');
+   R(x-6,y-15,13,12,'#1c3444');R(x-4,y-12,9,7,'#588293');
+   R(x-6,y+7,13,9,color);
+   R(x-7,y+20,5,4,braking?'#f27283':'#dba97d');
+   R(x+3,y+20,5,4,braking?'#f27283':'#dba97d');
+   R(x-4,y-24,9,3,'#a5a6a5');
+ }
+}
+function renderBackdrop(g,t,m,opt){
+ street(g,t,m,opt.W,opt.H,opt.S,opt.signal);
+ for(const b of m.buildings)paintBuilding(g,b,m,t);
+ drawExits(g,m,opt.S,opt.exits);
+ // In-universe plaque rather than a modern overlay running across the scene.
+ // Name is still available in the usual right-hand HUD.
+ const plaque=m.r===5?'OLD TOWN':m.r===4?'MIDTOWN':m.r===3?'DOWNTOWN':m.r===2?'UPTOWN':'ROBOT TOWN';
+ rect(g,36,36,118,18,'#151b2a');rect(g,39,38,112,2,'#6b667a');
+ text(g,plaque,94,48,11,C.white);
+}
+window.CC_CITY_ART=Object.freeze({renderBackdrop,drawCar,colors:C});
+})();
+
+</script>
+<script>
+/* CONVEYOR CLUB / THE BIG CITY — 2D world cartridge module.
+ * V006: rendering delegated to matching exterior-scene art module; game logic unchanged.
+ * Canonical inspiration: Claude's Vector City 6x4 grid, avenue/street names,
+ * neighborhoods, businesses and 30-second traffic phases; never imports 3D files.
+ * No new provider calls, no host privileges, no shared 3D code.
+ * 24 authored/procedural 2D blocks, 38 traffic actors, 29 persistent citizens.
+ */
+'use strict';
+(() => {
+  const rows=['SUBURBS','SUBURBS','UPTOWN','DOWNTOWN','MIDTOWN','OLD TOWN EDGE'];
+  const avenues=['1ST AVE','2ND AVE','CENTRAL AVE','4TH AVE','EDSEL AVE'];
+  const streets=['MALL RD','ELM ST','OAK ST','BANK ST','MAIN ST','MARKET ST','DOCK ST'];
+  const speedLimits=[20,20,30,30,25,25];
+  const shabby=['PAWN','DINER','LAUNDRY','RECORDS','DONUTS','BAIL BONDS'];
+  const shops=['PIZZA','ARCADE','BOOKS','HOTEL','COFFEE','TOYS','NOODLES','RADIO','CINEMA','FLOWERS'];
+  const P={sky:'#10141d',asphalt:'#252833',asphalt2:'#2d303c',edge:'#515160',concrete:'#5d6065',seam:'#42454b',paint:'#d4c277',white:'#c9c8c1',brick:'#65322f',brick2:'#783a31',rust:'#9b4e30',window:'#1d2c39',glass:'#23617b',gold:'#ffd14c',green:'#30c76e',red:'#e43a3e',orange:'#f08b35',blue:'#278fc6',neon:'#f0478d',steel:'#545c67',roof:'#252935'};
+  const zone=(r,c)=>`city-${r}-${c}`;
+  const parse=z=>{const m=/^city-([0-5])-([0-3])$/.exec(z||'');return m?{r:+m[1],c:+m[2]}:null;};
+  const validZone=z=>!!parse(z);
+  const key=(x,y)=>`${x},${y}`;
+  const hash=(r,c,x,y)=>((r+7)*73856093^(c+11)*19349663^(x+2)*83492791^(y+3)*1664525)>>>0;
+  const L=6; // four tile quadrants around a crossroad, shared across six districts.
+  const screens=new Map();
+  function makeMap(r,c){
+    const id=zone(r,c);if(screens.has(id))return screens.get(id);
+    const blocked=new Set(),buildings=[];
+    const block=(x,y,w,h)=>{for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)blocked.add(key(xx,yy));};
+    let kind=r===5?'shabby':r===4?'shop':r===3?'office':r===2?'tower':'house';
+    if(r===0&&c===1)kind='mall';if(r===0&&c===2)kind='parking';
+    const plots=[[3,2],[23,2],[3,14],[23,14]];
+    for(let i=0;i<4;i++){
+      const [x,y]=plots[i],h=hash(r,c,i,31),wide=kind==='tower'?8:kind==='office'?9:8;
+      if(kind==='parking')continue;
+      const w=kind==='house'?7:wide;
+      const bh=kind==='house'?4:kind==='shabby'?5:kind==='shop'?5:kind==='mall'?6:6;
+      // Individual plots are non-walkable; walkways around them remain open.
+      block(x,y,w,bh);
+      const words=kind==='shabby'?shabby:kind==='shop'?shops:kind==='mall'?['VECTOR MALL']:kind==='office'?['BANK','OFFICE','HOTEL','TOWER']:kind==='tower'?['TOWER','OFFICES','HQ','PLAZA']:['HOUSE','HOME','GARAGE','GARDEN'];
+      const caption=words[h%words.length];
+      buildings.push({x,y,w,h:bh,kind,caption,seed:h});
+    }
+    // Roads carry cars but not walking players. Players use marked crosswalks.
+    for(let y=1;y<20;y++)for(let x=1;x<33;x++){
+      const vert=x>=15&&x<=18,hori=y>=9&&y<=11;
+      if(vert&&!((y>=5&&y<=7)||(y>=15&&y<=17)))blocked.add(key(x,y));
+      if(hori&&!((x>=6&&x<=8)||(x>=25&&x<=27)))blocked.add(key(x,y));
+    }
+    const map={id,r,c,kind,blocked,buildings};screens.set(id,map);return map;
+  }
+  for(let r=0;r<6;r++)for(let c=0;c<4;c++)makeMap(r,c);
+  const walk=(z,x,y)=>{const m=screens.get(z);return !!m && x>0&&x<33&&y>0&&y<20&&!m.blocked.has(key(x,y));};
+  function nearest(z,x,y){if(!screens.has(z))return null;
+    if(walk(z,Math.floor(x),Math.floor(y)))return {x:Math.floor(x)+.5,y:Math.floor(y)+.5};
+    let best=null,d=Infinity;
+    for(let yy=1;yy<20;yy++)for(let xx=1;xx<33;xx++)if(walk(z,xx,yy)){
+      const cost=(x-xx-.5)**2+(y-yy-.5)**2;if(cost<d){d=cost;best={x:xx+.5,y:yy+.5};}
+    }return best;
+  }
+  const peopleNames=['ORBIT-12','DIAL-03','TICKER-17','REDLINE-05','MAGNET-41','ROTO-06','VINYL-09','SOLDER-18','PIVOT-25','BELL-14','SWITCH-32','ECHO-27','RATCHET-08','BAKELITE-11','FADER-23','COBALT-07','GRILLE-16','SPOOL-39','VOLTAGE-02','ZIPPER-21','NITRO-10','ALLOY-30','PUNCH-22','BOLT-19','METER-31','GASKET-13','REVERB-04','NEON-33','TURNTABLE-15'];
+  const personColors=['#d0703b','#b63e42','#3f9ac4','#c79b3f','#4fba84','#8a67ad'];
+  const citizens=[];
+  for(let i=0;i<29;i++){
+    const r=Math.floor(i*6/29),c=(i*7+3)%4;
+    const a=createEntity(peopleNames[i],'citizen',personColors[i%personColors.length],11,3,'city-citizen-'+String(i).padStart(2,'0'));
+    const spots=[[11,4],[21,4],[11,16],[21,16]];const at=spots[i%4];
+    a.x=at[0]+.5;a.y=at[1]+.5;a.zone=zone(r,c);a.task='streetwalking';a.speed=1.1+(i%4)*.17;a.dwell=1+i%5;
+    a.narrative='A regular resident of '+rows[r]+'.';a.path=[];a.target=null;
+    citizens.push(a);entities.push(a);
+  }
+  const cars=[];
+  const carColors=['#b84232','#2e83b6','#d5a42f','#73717d','#329571','#e8d7a7','#8e4e80'];
+  for(let i=0;i<38;i++){
+    const horizontal=i<22, lane=horizontal?Math.floor(i*6/22):Math.floor((i-22)*4/16);
+    const length=horizontal?4*W:6*H,forward=i%2===0;
+    const from=(i*17+11)%length;
+    cars.push({id:'city-car-'+i,horizontal,lane,forward,u:from, v:0,limit:(horizontal?speedLimits[lane]:25)/20*2.8,
+      color:carColors[i%carColors.length],braking:false,passed:-1});
+  }
+  // One city-wide traffic clock. Traffic obeys the same timing family as the
+  // 3D source: NS 12s green/3s yellow; EW 12s green/3s yellow.
+  let trafficTime=0;
+  const signal=()=>{const t=trafficTime%30;return {ns:t<12?'G':t<15?'Y':'R',ew:t<15?'R':t<27?'G':'Y'};};
+  const loops=c=>c.horizontal?4*W:6*H;
+  function carPos(c){const global=c.u%loops(c);
+    if(c.horizontal){return{x:global,y:c.lane*H+(c.forward?9.35:10.6),row:c.lane,col:Math.floor(global/W)}}
+    return{x:c.lane*W+(c.forward?16.35:17.55),y:global,col:c.lane,row:Math.floor(global/H)};
+  }
+  function updateCars(dt){trafficTime+=dt;
+    const sig=signal();
+    for(const c of cars){
+      const p=carPos(c);const local=c.horizontal?p.x%W:p.y%H;const middle=c.horizontal?16.5:10.5;
+      const signed=c.forward?middle-local:local-middle;
+      let target=c.limit;
+      const color=c.horizontal?sig.ew:sig.ns;
+      // Cars stop before the intersection unless its light is green.
+      if(signed>0&&signed<5&&color!=='G'&&c.passed!==Math.floor(c.u/(c.horizontal?W:H))){target=Math.max(0,(signed-2.5)*1.9);}
+      if(signed<-4)c.passed=-1;
+      // Braking behind a car in the same road lane, preventing pileups.
+      const f=c.forward?1:-1;
+      for(const o of cars){if(o===c||o.horizontal!==c.horizontal||o.lane!==c.lane||o.forward!==c.forward)continue;
+        const gap=(o.u-c.u)*f; if(gap>0&&gap<3.5)target=Math.min(target,Math.max(0,gap-1.8));
+      }
+      // Crosswalks take priority over traffic; these citizens are not disposable sprites.
+      if(player.zone?.startsWith('city-')){
+        const pos=carPos(c), pp=parse(player.zone);
+        if(pp&&pp.r===pos.row&&pp.c===pos.col){const lx=pos.x%W,ly=pos.y%H;
+          if(Math.abs(lx-player.x)<2&&Math.abs(ly-player.y)<2.2)target=0;
+        }
+      }
+      c.braking=target<c.v-.1;c.v=Math.max(0,Math.min(c.limit,target,c.v+(target>c.v?4:-9)*dt));
+      c.u=(c.u+(c.forward?1:-1)*c.v*dt+loops(c))%loops(c);
+    }
+  }
+  function cityInfo(m){return `${rows[m.r]} · ${avenues[m.c]} / ${streets[m.r+1]}`;}
+  function visit(z,x,y){if(!screens.has(z))return false;
+    if(talkingTo)endTalk('You walked into another neighborhood.');
+    window.clubArcade?.close?.();approach=null;selected=null;hovered=null;
+    player.zone=z;player.path=[];moveTrail=null;const p=nearest(z,x,y)||{x:11.5,y:7.5};player.x=p.x;player.y=p.y;
+    q('currentLocation').textContent='THE BIG CITY · '+rows[parse(z).r];
+    q('inspector').textContent=`${cityInfo(screens.get(z))}. Explore the streets; no routes are saved for you.`;
+    q('notice').textContent='';
+    window.ccSaveWorldNow?.();return true;
+  }
+  function fromClub(){return visit(zone(5,0),2.5,8.5);}
+  function toOutside(){if(talkingTo)endTalk('You left the city.');
+    player.zone='outside';player.x=31.5;player.y=6.5;player.path=[];moveTrail=null;
+    q('currentLocation').textContent='RIVERFRONT · CLUB PARKING LOT';
+    q('inspector').textContent='The Conveyor Club is back along the riverfront walkway.';window.ccSaveWorldNow?.();
+  }
+  const exits=[{x:1,y:8,dx:-1,dy:0},{x:32,y:8,dx:1,dy:0},{x:12,y:1,dx:0,dy:-1},{x:12,y:19,dx:0,dy:1}];
+  function checkExit(){const z=parse(player.zone);if(!z||player.path.length)return;
+    const at=exits.find(p=>p.x===Math.floor(player.x)&&p.y===Math.floor(player.y));if(!at)return;
+    const nr=z.r+at.dy,nc=z.c+at.dx;
+    if(nr<0||nr>5||nc<0||nc>3){
+      if(z.r===5&&z.c===0&&at.dx===-1)return toOutside();
+      if(z.r===5&&z.c===3&&at.dx===1)return window.CC_EDSEL?.visit?.('edsel-yard',2,16);
+      q('inspector').textContent='End of the accessible district. The city continues beyond the barricade.';
+      player.x=at.x+(at.dx?-at.dx*.8:0);player.y=at.y+(at.dy?-at.dy*.8:0);return;
+    }
+    // Arrival is a walkable tile near the matching edge, no teleport map shortcut.
+    const newX=at.dx<0?31.5:at.dx>0?2.5:player.x;
+    const newY=at.dy<0?18.5:at.dy>0?2.5:player.y;
+    visit(zone(nr,nc),newX,newY);
+  }
+  function updateCitizens(dt){for(const a of citizens){
+    if(a.path.length){moveEntity(a,dt);continue;}
+    a.dwell-=dt;if(a.dwell>0)continue;
+    const candidates=[[11,4],[21,4],[11,16],[21,16],[12,8],[22,8],[12,12],[22,12]];
+    const good=candidates.filter(p=>walk(a.zone,p[0],p[1]));
+    const pick=good[(hash(+a.id.slice(-2),parse(a.zone).c,Math.floor(trafficTime/7),7))%good.length];
+    if(pick)a.path=pathfind(a,{x:pick[0],y:pick[1]});
+    a.dwell=4+(hash(+a.id.slice(-2),3,2,Math.floor(trafficTime))%100)/18;
+  }}
+  function tickCity(dt){if(simPaused)return;const step=dt*simSpeed;updateCars(step);updateCitizens(step);if(parse(player.zone))checkExit();}
+  function draw(t){
+    const m=screens.get(player.zone);if(!m)return;
+    const R=(x,y,w,h,color)=>{ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
+    const T=(s,x,y,size=13,color=P.white,align='center')=>{ctx.font=`bold ${size}px monospace`;ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillStyle='#07090f';ctx.fillText(s,x+2,y+2);ctx.fillStyle=color;ctx.fillText(s,x,y);};
+    if(window.CC_CITY_ART){
+      window.CC_CITY_ART.renderBackdrop(ctx,t,m,{S,W,H,signal,exits});
+    }else{
+      R(0,0,W*S,H*S,P.sky);
+    }
+    for(const c of cars){const pos=carPos(c);
+      if(pos.row!==m.r||pos.col!==m.c)continue;
+      const x=(pos.x%W)*S,y=(pos.y%H)*S,vertical=!c.horizontal;
+      if(window.CC_CITY_ART){
+        window.CC_CITY_ART.drawCar(ctx,{x,y,horizontal:c.horizontal,color:c.color,braking:c.braking,seed:Number(c.id.split('-').pop())||0});
+      }else if(vertical){R(x-8,y-23,17,45,'#10141c');R(x-6,y-19,13,37,c.color);}
+      else{R(x-23,y-9,46,19,c.color);}
+
+    }
+    const visible=citizens.filter(a=>a.zone===player.zone&&a.active).concat(player).sort((a,b)=>a.y-b.y);
+    const partners=new Map();for(const a of visible)drawRobot(a,t,a===player,partners);
+    if(moveTrail){ctx.strokeStyle=P.gold;ctx.lineWidth=2;ctx.strokeRect(moveTrail.x*S+4,moveTrail.y*S+4,S-8,S-8);}
+  }
+  const ncValid=n=>n>=0&&n<4;
+  const originalTick=tick,originalRender=render;
+  tick=function(dt){originalTick(dt);tickCity(dt);};
+  render=function(t){if(parse(player.zone))draw(t);else originalRender(t);};
+  function onCityClick(e){if(!parse(player.zone))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const bounds=canvas.getBoundingClientRect();
+    const px=(e.clientX-bounds.left)*canvas.width/bounds.width,py=(e.clientY-bounds.top)*canvas.height/bounds.height;
+    const target=citizens.filter(a=>a.active&&a.zone===player.zone).map(a=>({a,d:Math.hypot(px-a.x*S,py-(a.y*S-9))})).sort((a,b)=>a.d-b.d)[0];
+    if(target&&target.d<20){targetRobot(target.a);return;}
+    const x=Math.floor(px/S),y=Math.floor(py/S);
+    if(!go(x,y))q('inspector').textContent='That way is blocked. Use the marked crosswalks and sidewalks.';
+  }
+  canvas.addEventListener('pointerdown',onCityClick,true);
+  function ready(){if(parse(player.zone)){
+    const p=nearest(player.zone,player.x,player.y);if(p){player.x=p.x;player.y=p.y;player.path=[];}
+    q('currentLocation').textContent='THE BIG CITY · '+rows[parse(player.zone).r];
+    q('inspector').textContent=cityInfo(screens.get(player.zone));
+  }}
+  if(window._ccBootReady)ready();else window.addEventListener('cc:boot-ready',ready,{once:true});
+  window.CC_CITY=Object.freeze({walk,nearest,visit,fromClub,validZone,rows,avenues,streets,zone,people:citizens,cars,
+    get trafficTime(){return trafficTime;},signal,inspect:()=>({zone:player.zone,blocks:screens.size,cars:cars.length,citizens:citizens.length,
+      moving:cars.filter(c=>c.v>.3).length,phase:signal(),accessible:validZone(player.zone)})});
+})();
+
+</script>
+<script>
+'use strict';
+const step={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+function moveDirection(dir){const d=step[dir];if(!d||!window.CC_CITY?.validZone(player.zone))return;
+ const end=player.path.length?player.path[player.path.length-1]:player;
+ go(Math.max(1,Math.min(32,Math.floor(end.x)+d[0])),Math.max(1,Math.min(19,Math.floor(end.y)+d[1])));
+}
+q('startCity').addEventListener('click',()=>{CC_CITY.fromClub();q('startCity').textContent='RESTART CITY';q('notice').textContent='Walk north toward Midtown · east along the streets';});
+let held=null,holdTimer=null;
+let zoomOn=window.matchMedia('(max-width:600px) and (orientation:portrait)').matches;
+function setZoom(value){zoomOn=value;q('world').classList.toggle('zoom',zoomOn);q('zoomBtn').textContent=zoomOn?'FIT':'ZOOM 2X';if(!zoomOn){canvas.style.left='';canvas.style.top='';}}
+q('zoomBtn').addEventListener('click',()=>setZoom(!zoomOn));setZoom(zoomOn);
+function followCamera(){if(!zoomOn)return;const box=q('world'),cw=box.clientWidth*2,ch=cw*672/1088,scale=cw/1088;const left=Math.max(box.clientWidth-cw,Math.min(0,box.clientWidth/2-player.x*S*scale));const top=ch<box.clientHeight?(box.clientHeight-ch)/2:Math.max(box.clientHeight-ch,Math.min(0,box.clientHeight/2-player.y*S*scale));canvas.style.left=Math.round(left)+'px';canvas.style.top=Math.round(top)+'px';}
+function stop(){held=null;clearInterval(holdTimer);holdTimer=null;}
+for(const button of document.querySelectorAll('[data-dir]')){
+ button.addEventListener('pointerdown',e=>{e.preventDefault();stop();held=button.dataset.dir;moveDirection(held);holdTimer=setInterval(()=>{if(held)moveDirection(held)},190);try{button.setPointerCapture(e.pointerId)}catch{}});
+ ['pointerup','pointercancel','lostpointercapture'].forEach(evt=>button.addEventListener(evt,stop));
+}
+q('stop').addEventListener('click',()=>{player.path=[];moveTrail=null;stop();});
+window.addEventListener('blur',stop);window.addEventListener('pointerup',stop);
+window.addEventListener('keydown',e=>{const k={ArrowUp:'up',KeyW:'up',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',KeyS:'down'}[e.code];if(k){e.preventDefault();moveDirection(k);}});
+try{const saved=JSON.parse(localStorage.getItem('cc-2d-demo-location')||'null');if(saved&&CC_CITY.validZone(saved.zone)&&Number.isFinite(saved.x)&&Number.isFinite(saved.y)){CC_CITY.visit(saved.zone,saved.x,saved.y);q('startCity').textContent='RESTART CITY';}}
+catch{}
+function frame(now){const dt=Math.min(.08,(now-lastTime)/1000||.016);lastTime=now;elapsed+=dt;moveEntity(player,dt);tick(dt);render(now/1000);followCamera();
+ if(Math.floor(now/500)!==Math.floor((now-16)/500))q('trafficHUD').textContent=`${CC_CITY.inspect().moving} MOVING CARS · ${CC_CITY.signal().ns}/${CC_CITY.signal().ew}`;
+ requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script>
+</body></html>
